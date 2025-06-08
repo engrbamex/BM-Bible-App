@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BM Bible App</title>
+
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter for a clean, readable text, Playfair Display for headings -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+
+    <!-- Feather Icons for UI elements -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <!-- Tone.js for background audio generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+
+    <style>
+        /* Custom styles to enhance the UI */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        h1, h2 {
+            font-family: 'Playfair Display', serif;
+        }
+        /* Custom scrollbar for a more polished look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Style for the verse numbers */
+        .verse-number {
+            font-weight: 600;
+            font-size: 0.7em;
+            vertical-align: super;
+            margin-right: 0.3em;
+            color: #64748b;
+        }
+        .dark .verse-number { color: #94a3b8; }
+
+        /* Verse highlight style for search */
+        .search-highlight {
+            background-color: #a7f3d0; /* teal-200 */
+            border-radius: 0.25rem;
+            padding: 0 0.1rem;
+        }
+        .dark .search-highlight {
+            background-color: #14b8a6; /* teal-500 */
+            color: #0f172a; /* slate-900 */
+        }
+
+        /* Highlight for audio reading */
+        .speaking-highlight {
+            background-color: #bfdbfe; /* blue-200 (light background for light text) */
+            border-radius: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            margin: -0.25rem -0.5rem;
+            transition: background-color 0.3s ease, color 0.3s ease; /* Added color to transition */
+        }
+        .dark .speaking-highlight {
+            background-color: #1e3a8a; /* blue-800 (dark background for white text) */
+            color: white; /* Explicitly set text to white for readability in dark mode */
+        }
+
+        /* Entrance animation for content */
+        .content-enter {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .content-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* Button disabled state */
+        .nav-btn:disabled, select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Custom Background Overlay with SVG pattern */
+        #background-overlay {
+            /* Default (Light) Theme Background */
+            background: linear-gradient(to bottom right, #f0f9ff, #e0f2fe); /* light blue gradient */
+            /* SVG of a cross, light gray stroke for light theme, encoded for CSS */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 24 24' fill='none' stroke='%23e2e8f0' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2V22M17 12H7'/%3E%3C/svg%3E");
+            background-repeat: repeat; /* Repeat the pattern */
+            background-size: 150px 150px; /* Size of each pattern tile */
+            background-position: center center;
+        }
+
+        /* Dark Theme Background */
+        .dark #background-overlay {
+            background: linear-gradient(to bottom right, #0f172a, #1e293b); /* dark blue-gray gradient */
+            /* SVG of a cross, darker gray stroke for dark theme, encoded for CSS */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2V22M17 12H7'/%3E%3C/svg%3E");
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white transition-colors duration-300 relative min-h-screen">
+    <!-- Background Overlay with SVG -->
+    <div class="fixed inset-0 z-0 opacity-10 transition-colors duration-300" id="background-overlay"></div>
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-4xl relative z-10">
+
+        <!-- Header Section with Theme Toggle -->
+        <header class="flex justify-between items-center mb-8">
+            <div class="text-left">
+                <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">BM Bible App</h1>
+                <p class="text-slate-500 dark:text-white mt-1">Select a book, chapter, and version to start reading.</p>
+            </div>
+            <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <span id="theme-icon-light" class="hidden"><i data-feather="moon"></i></span>
+                <span id="theme-icon-dark"><i data-feather="sun"></i></span>
+            </button>
+        </header>
+
+        <!-- Controls Section -->
+        <div class="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-lg mb-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <!-- Book Selection -->
+                <div>
+                    <label for="book-select" class="block text-sm font-medium text-slate-700 dark:text-white mb-1">Book</label>
+                    <select id="book-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"></select>
+                </div>
+                <!-- Chapter Selection -->
+                <div>
+                    <label for="chapter-select" class="block text-sm font-medium text-slate-700 dark:text-white mb-1">Chapter</label>
+                    <select id="chapter-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"></select>
+                </div>
+                <!-- Verse Selection -->
+                <div>
+                    <label for="verse-select" class="block text-sm font-medium text-slate-700 dark:text-white mb-1">Verse</label>
+                    <select id="verse-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5" disabled></select>
+                </div>
+                <!-- Version Selection -->
+                <div>
+                    <label for="version-select" class="block text-sm font-medium text-slate-700 dark:text-white mb-1">Version</label>
+                    <select id="version-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"></select>
+                </div>
+            </div>
+            <!-- Voice Selection -->
+            <div class="mt-4">
+                <label for="voice-select" class="block text-sm font-medium text-slate-700 dark:text-white mb-1">Voice</label>
+                <select id="voice-select" class="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"></select>
+            </div>
+
+            <!-- Old Testament / New Testament Buttons -->
+            <div class="flex justify-center space-x-4 mt-4">
+                <button id="ot-button" class="px-6 py-2 rounded-lg font-semibold transition-colors
+                                             bg-blue-200 text-blue-800 hover:bg-blue-300
+                                             dark:bg-blue-800 dark:text-white dark:hover:bg-blue-700">
+                    Old Testament
+                </button>
+                <button id="nt-button" class="px-6 py-2 rounded-lg font-semibold transition-colors
+                                             bg-green-200 text-green-800 hover:bg-green-300
+                                             dark:bg-green-800 dark:text-white dark:hover:bg-green-700">
+                    New Testament
+                </button>
+                <button id="all-books-button" class="px-6 py-2 rounded-lg font-semibold transition-colors
+                                                bg-slate-200 text-slate-800 hover:bg-slate-300
+                                                dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600">
+                    All Books
+                </button>
+            </div>
+            <!-- Audio Controls -->
+            <div class="flex flex-wrap justify-center gap-4 mt-6 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg shadow-inner">
+                <button id="play-audio-btn" class="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition-colors">
+                    <i data-feather="play" class="w-5 h-5"></i> Play Audio
+                </button>
+                <button id="pause-audio-btn" class="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition-colors">
+                    <i data-feather="pause" class="w-5 h-5"></i> Pause Audio
+                </button>
+                <button id="stop-audio-btn" class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition-colors">
+                    <i data-feather="stop-circle" class="w-5 h-5"></i> Stop Audio
+                </button>
+                <button id="show-daily-verse-btn" class="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg shadow hover:bg-purple-600 transition-colors">
+                    <i data-feather="calendar" class="w-5 h-5"></i> Daily Verse
+                </button>
+            </div>
+            <!-- Search Bar -->
+            <div class="flex items-center space-x-2 mt-6 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg shadow-inner">
+                <input type="text" id="search-input" placeholder="Search for words (current chapter only)..."
+                       class="flex-grow bg-white dark:bg-slate-600 border border-slate-300 dark:border-slate-500 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                <button id="search-btn" class="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition-colors flex items-center gap-1">
+                    <i data-feather="search" class="w-4 h-4"></i> Search
+                </button>
+                <button id="clear-search-btn" class="px-4 py-2 bg-slate-400 text-white rounded-lg shadow hover:bg-slate-500 transition-colors flex items-center gap-1">
+                    <i data-feather="x-circle" class="w-4 h-4"></i> Clear
+                </button>
+            </div>
+            <p id="search-results-count" class="text-sm text-slate-600 dark:text-white mt-2 text-center hidden"></p>
+        </div>
+
+        <!-- Content Display Section -->
+        <main id="content-display" class="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-xl shadow-lg min-h-[400px]">
+            <!-- UI Messages Container -->
+            <div id="message-container" class="flex items-center justify-center min-h-[300px]">
+                <div id="loading-indicator" class="text-center py-16 hidden">
+                    <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="mt-4 text-slate-500 dark:text-white">Loading Scripture...</p>
+                </div>
+                <div id="welcome-message" class="text-center py-16 text-slate-500 dark:text-white">
+                    <p>Please select a book and chapter to begin reading.</p>
+                </div>
+                <div id="error-message" class="text-center py-16 text-red-500 hidden"></div>
+            </div>
+
+            <!-- Bible Content -->
+            <div id="bible-content" class="hidden">
+                <h2 id="chapter-title" class="text-2xl sm:text-3xl font-bold mb-6 border-b border-slate-200 dark:border-slate-700 pb-4 text-slate-800 dark:text-white"></h2>
+                <div id="verses-container" class="space-y-4 text-base sm:text-lg leading-relaxed text-slate-700 dark:text-white"></div>
+            </div>
+        </main>
+
+        <!-- Navigation Buttons (Chapter Prev/Next) -->
+        <div id="navigation-controls" class="flex justify-between items-center mt-6 hidden">
+            <button id="prev-chapter-btn" class="nav-btn flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-semibold py-2 px-4 rounded-lg shadow transition-colors">
+                <i data-feather="arrow-left" class="w-4 h-4"></i> Previous
+            </button>
+            <button id="next-chapter-btn" class="nav-btn flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition-colors">
+                Next <i data-feather="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Daily Verse Pop-up Modal -->
+        <div id="daily-verse-modal" class="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 sm:p-8 max-w-lg w-full text-center transform transition-all scale-95 opacity-0" id="daily-verse-content">
+                <h3 class="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4 flex items-center justify-center gap-2">
+                    <i data-feather="book-open" class="w-6 h-6"></i> Daily Memory Verse
+                </h3>
+                <p id="daily-verse-text" class="text-lg sm:text-xl font-medium text-slate-800 dark:text-white mb-4 italic"></p>
+                <p id="daily-verse-reference" class="text-md sm:text-lg text-slate-600 dark:text-white font-semibold"></p>
+                <button id="close-daily-verse-btn" class="mt-6 px-6 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition-colors">
+                    Got it!
+                </button>
+            </div>
+        </div>
+
+
+        <!-- Footer -->
+        <footer class="text-center mt-8 text-sm text-slate-500 dark:text-white">
+            <p>Content provided by <a href="https://bible-api.com/" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">bible-api.com</a>.</p>
+            <p class="mt-1">
+                Note: This API primarily offers public domain translations. Other popular translations like The Passion Translation, New Living Translation, Amplified Bible, The Message, and New King James Version are typically copyrighted and require licensed APIs for their content.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // --- DATA & STATE --- //
+        // Define all Bible books with their chapter counts and testament
+        const BIBLE_BOOKS = [
+            // Old Testament
+            { name: "Genesis", chapters: 50, testament: "Old Testament" },
+            { name: "Exodus", chapters: 40, testament: "Old Testament" },
+            { name: "Leviticus", chapters: 27, testament: "Old Testament" },
+            { name: "Numbers", chapters: 36, testament: "Old Testament" },
+            { name: "Deuteronomy", chapters: 34, testament: "Old Testament" },
+            { name: "Joshua", chapters: 24, testament: "Old Testament" },
+            { name: "Judges", chapters: 21, testament: "Old Testament" },
+            { name: "Ruth", chapters: 4, testament: "Old Testament" },
+            { name: "1 Samuel", chapters: 31, testament: "Old Testament" },
+            { name: "2 Samuel", chapters: 24, testament: "Old Testament" },
+            { name: "1 Kings", chapters: 22, testament: "Old Testament" },
+            { name: "2 Kings", chapters: 25, testament: "Old Testament" },
+            { name: "1 Chronicles", chapters: 29, testament: "Old Testament" },
+            { name: "2 Chronicles", chapters: 36, testament: "Old Testament" },
+            { name: "Ezra", chapters: 10, testament: "Old Testament" },
+            { name: "Nehemiah", chapters: 13, testament: "Old Testament" },
+            { name: "Esther", chapters: 10, testament: "Old Testament" },
+            { name: "Job", chapters: 42, testament: "Old Testament" },
+            { name: "Psalms", chapters: 150, testament: "Old Testament" },
+            { name: "Proverbs", chapters: 31, testament: "Old Testament" },
+            { name: "Ecclesiastes", chapters: 12, testament: "Old Testament" },
+            { name: "Song of Solomon", chapters: 8, testament: "Old Testament" },
+            { name: "Isaiah", chapters: 66, testament: "Old Testament" },
+            { name: "Jeremiah", chapters: 52, testament: "Old Testament" },
+            { name: "Lamentations", chapters: 5, testament: "Old Testament" },
+            { name: "Ezekiel", chapters: 48, testament: "Old Testament" },
+            { name: "Daniel", chapters: 12, testament: "Old Testament" },
+            { name: "Hosea", chapters: 14, testament: "Old Testament" },
+            { name: "Joel", chapters: 3, testament: "Old Testament" },
+            { name: "Amos", chapters: 9, testament: "Old Testament" },
+            { name: "Obadiah", chapters: 1, testament: "Old Testament" },
+            { name: "Jonah", chapters: 4, testament: "Old Testament" },
+            { name: "Micah", chapters: 7, testament: "Old Testament" },
+            { name: "Nahum", chapters: 3, testament: "Old Testament" },
+            { name: "Habakkuk", chapters: 3, testament: "Old Testament" },
+            { name: "Zephaniah", chapters: 3, testament: "Old Testament" },
+            { name: "Haggai", chapters: 2, testament: "Old Testament" },
+            { name: "Zechariah", chapters: 14, testament: "Old Testament" },
+            { name: "Malachi", chapters: 4, testament: "Old Testament" },
+            // New Testament
+            { name: "Matthew", chapters: 28, testament: "New Testament" },
+            { name: "Mark", chapters: 16, testament: "New Testament" },
+            { name: "Luke", chapters: 24, testament: "New Testament" },
+            { name: "John", chapters: 21, testament: "New Testament" },
+            { name: "Acts", chapters: 28, testament: "New Testament" },
+            { name: "Romans", chapters: 16, testament: "New Testament" },
+            { name: "1 Corinthians", chapters: 16, testament: "New Testament" },
+            { name: "2 Corinthians", chapters: 13, testament: "New Testament" },
+            { name: "Galatians", chapters: 6, testament: "New Testament" },
+            { name: "Ephesians", chapters: 6, testament: "New Testament" },
+            { name: "Philippians", chapters: 4, testament: "New Testament" },
+            { name: "Colossians", chapters: 4, testament: "New Testament" },
+            { name: "1 Thessalonians", chapters: 5, testament: "New Testament" },
+            { name: "2 Thessalonians", chapters: 3, testament: "New Testament" },
+            { name: "1 Timothy", chapters: 6, testament: "New Testament" },
+            { name: "2 Timothy", chapters: 4, testament: "New Testament" },
+            { name: "Titus", chapters: 3, testament: "New Testament" },
+            { name: "Philemon", chapters: 1, testament: "New Testament" },
+            { name: "Hebrews", chapters: 13, testament: "New Testament" },
+            { name: "James", chapters: 5, testament: "New Testament" },
+            { name: "1 Peter", chapters: 5, testament: "New Testament" },
+            { name: "2 Peter", chapters: 3, testament: "New Testament" },
+            { name: "1 John", chapters: 5, testament: "New Testament" },
+            { name: "2 John", chapters: 1, testament: "New Testament" },
+            { name: "3 John", chapters: 1, testament: "New Testament" },
+            { name: "Jude", chapters: 1, testament: "New Testament" },
+            { name: "Revelation", chapters: 22, testament: "New Testament" }
+        ];
+
+        // Bible versions supported by bible-api.com
+        const BIBLE_VERSIONS_LIST = [
+            { name: "King James Version (KJV)", value: "kjv" },
+            { name: "American Standard Version (ASV)", value: "asv" },
+            { name: "World English Bible (WEB)", value: "web" },
+            { name: "Bible in Basic English (BBE)", value: "bbe" },
+            { name: "Darby English Bible (DARBY)", value: "darby" },
+            { name: "Douay-Rheims 1899 American Edition (DRA)", value: "dra" },
+            { name: "Webster's Bible (WBT)", value: "wbt" },
+            { name: "Young's Literal Translation (YLT)", value: "ylt" }
+        ];
+
+        // Curated list of memory verses for the daily pop-up
+        const MEMORY_VERSES = [
+            { text: "The Lord is my shepherd; I shall not want.", reference: "Psalm 23:1" },
+            { text: "Trust in the Lord with all your heart and lean not on your own understanding; in all your ways submit to him, and he will make your paths straight.", reference: "Proverbs 3:5-6" },
+            { text: "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.", reference: "John 3:16" },
+            { text: "I can do all things through Christ who strengthens me.", reference: "Philippians 4:13" },
+            { text: "For where two or three gather in my name, there am I with them.", reference: "Matthew 18:20" },
+            { text: "But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.", reference: "Galatians 5:22-23" },
+            { text: "The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning; great is your faithfulness.", reference: "Lamentations 3:22-23" },
+            { text: "Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go.", reference: "Joshua 1:9" },
+            { text: "Delight yourself in the Lord, and he will give you the desires of your heart.", reference: "Psalm 37:4" },
+            { text: "The fear of the Lord is the beginning of knowledge, but fools despise wisdom and instruction.", reference: "Proverbs 1:7" },
+            { text: "Come to me, all you who are weary and burdened, and I will give you rest.", reference: "Matthew 11:28" },
+            { text: "Finally, brothers and sisters, whatever is true, whatever is noble, whatever is right, whatever is pure, whatever is lovely, whatever is admirable—if anything is excellent or praiseworthy—think about such things.", reference: "Philippians 4:8" },
+            { text: "Give thanks to the Lord, for he is good; his love endures forever.", reference: "Psalm 107:1" },
+            { text: "A new command I give you: Love one another. As I have loved you, so you must love one another.", reference: "John 13:34" },
+            { text: "No temptation has overtaken you except what is common to mankind. And God is faithful; he will not let you be tempted beyond what you can bear. But when you are tempted, he will also provide a way out so that you can endure it.", reference: "1 Corinthians 10:13" }
+        ];
+
+
+        let currentBookFilter = 'all'; // 'all', 'Old Testament', 'New Testament'
+        let speechSynth = window.speechSynthesis;
+        let utterance = null;
+        let currentChapterContent = []; // Store fetched verses to facilitate search and audio
+        let availableSpeechVoices = []; // To store available voices
+
+        // Tone.js audio setup for background music
+        let backgroundSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: {
+                type: "sine" // Changed to sine for a softer, smoother sound
+            },
+            envelope: {
+                attack: 3,    // Longer attack for fading in
+                decay: 1,
+                sustain: 0.8,
+                release: 5    // Very long release for a smooth fade out
+            },
+            detune: 0 // Removed detune for cleaner harmony
+        }).toDestination();
+
+        let backgroundReverb = new Tone.Reverb({
+            decay: 6,       // Long decay for ambiance
+            preDelay: 0.2,  // Pre-delay for spaciousness
+            wet: 0.5        // Mix of dry/wet signal
+        }).toDestination();
+
+        backgroundSynth.connect(backgroundReverb); // Connect synth through reverb
+
+        let backgroundLoop = null; // Will hold the Tone.Loop instance for background music
+
+        // --- DOM ELEMENT REFERENCES --- //
+        const dom = {
+            html: document.documentElement,
+            bookSelect: document.getElementById('book-select'),
+            chapterSelect: document.getElementById('chapter-select'),
+            verseSelect: document.getElementById('verse-select'),
+            versionSelect: document.getElementById('version-select'),
+            voiceSelect: document.getElementById('voice-select'), // New voice select element
+            themeToggle: document.getElementById('theme-toggle'),
+            themeIconLight: document.getElementById('theme-icon-light'),
+            themeIconDark: document.getElementById('theme-icon-dark'),
+            messageContainer: document.getElementById('message-container'),
+            loadingIndicator: document.getElementById('loading-indicator'),
+            welcomeMessage: document.getElementById('welcome-message'),
+            errorMessage: document.getElementById('error-message'),
+            bibleContent: document.getElementById('bible-content'),
+            chapterTitle: document.getElementById('chapter-title'),
+            versesContainer: document.getElementById('verses-container'),
+            navigationControls: document.getElementById('navigation-controls'),
+            prevChapterBtn: document.getElementById('prev-chapter-btn'),
+            nextChapterBtn: document.getElementById('next-chapter-btn'),
+            otButton: document.getElementById('ot-button'),
+            ntButton: document.getElementById('nt-button'),
+            allBooksButton: document.getElementById('all-books-button'),
+            // Audio controls
+            playAudioBtn: document.getElementById('play-audio-btn'),
+            pauseAudioBtn: document.getElementById('pause-audio-btn'),
+            stopAudioBtn: document.getElementById('stop-audio-btn'),
+            showDailyVerseBtn: document.getElementById('show-daily-verse-btn'), // New button
+            // Search controls
+            searchInput: document.getElementById('search-input'),
+            searchBtn: document.getElementById('search-btn'),
+            clearSearchBtn: document.getElementById('clear-search-btn'),
+            searchResultsCount: document.getElementById('search-results-count'),
+            // Daily Verse Modal elements
+            dailyVerseModal: document.getElementById('daily-verse-modal'),
+            dailyVerseContent: document.getElementById('daily-verse-content'),
+            dailyVerseText: document.getElementById('daily-verse-text'),
+            dailyVerseReference: document.getElementById('daily-verse-reference'),
+            closeDailyVerseBtn: document.getElementById('close-daily-verse-btn')
+        };
+
+
+        // --- UI & THEME FUNCTIONS --- //
+
+        /**
+         * Applies the selected theme (light/dark) to the document.
+         * @param {boolean} isDark - True to apply dark theme, false for light theme.
+         */
+        function applyTheme(isDark) {
+            dom.html.classList.toggle('dark', isDark);
+            dom.themeIconLight.classList.toggle('hidden', !isDark);
+            dom.themeIconDark.classList.toggle('hidden', isDark);
+            localStorage.setItem('bibleAppTheme', isDark ? 'dark' : 'light');
+        }
+
+        /**
+         * Toggles between light and dark themes.
+         */
+        function toggleTheme() {
+            applyTheme(!dom.html.classList.contains('dark'));
+        }
+
+        /**
+         * Shows a specific message type in the content area (loading, welcome, error).
+         * Hides Bible content and navigation controls.
+         * @param {string} type - 'loading', 'welcome', or 'error'.
+         * @param {string} messageText - The text to display for 'error' messages.
+         */
+        function showMessage(type, messageText = '') {
+            dom.messageContainer.classList.remove('hidden');
+            dom.bibleContent.classList.add('hidden');
+            dom.navigationControls.classList.add('hidden');
+            stopAudio(); // Stop any ongoing audio (speech and background) when a message is shown
+
+            // Hide all message types first
+            [dom.loadingIndicator, dom.welcomeMessage, dom.errorMessage].forEach(el => el.classList.add('hidden'));
+
+            // Show the requested message type
+            if (type === 'loading') {
+                dom.loadingIndicator.classList.remove('hidden');
+            } else if (type === 'welcome') {
+                dom.welcomeMessage.classList.remove('hidden');
+            } else if (type === 'error') {
+                dom.errorMessage.textContent = messageText;
+                dom.errorMessage.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Shows the Bible content section and navigation controls.
+         * Applies a subtle entrance animation.
+         */
+        function showContent() {
+            dom.messageContainer.classList.add('hidden');
+            dom.bibleContent.classList.remove('hidden');
+            dom.navigationControls.classList.remove('hidden');
+
+            // Trigger reflow to restart animation
+            dom.bibleContent.classList.remove('content-enter', 'content-enter-active');
+            void dom.bibleContent.offsetWidth; // Force reflow
+            dom.bibleContent.classList.add('content-enter');
+            setTimeout(() => dom.bibleContent.classList.add('content-enter-active'), 10);
+        }
+
+        // --- CORE LOGIC FUNCTIONS --- //
+
+        /**
+         * Populates the version selection dropdown with the available API-supported versions.
+         */
+        function populateVersions() {
+            dom.versionSelect.innerHTML = ''; // Clear existing options
+            BIBLE_VERSIONS_LIST.forEach(version => {
+                const option = document.createElement('option');
+                option.value = version.value;
+                option.textContent = version.name;
+                dom.versionSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * Populates the book selection dropdown, filtered by testament.
+         */
+        function populateBooks() {
+            dom.bookSelect.innerHTML = ''; // Clear existing options
+
+            const oldTestamentGroup = document.createElement('optgroup');
+            oldTestamentGroup.label = 'Old Testament';
+            const newTestamentGroup = document.createElement('optgroup');
+            newTestamentGroup.label = 'New Testament';
+
+            BIBLE_BOOKS.forEach(book => {
+                // Filter books based on currentBookFilter
+                const shouldAdd = (currentBookFilter === 'all') || (book.testament === currentBookFilter);
+
+                if (shouldAdd) {
+                    const option = document.createElement('option');
+                    option.value = book.name;
+                    option.textContent = book.name;
+                    if (book.testament === "Old Testament") {
+                        oldTestamentGroup.appendChild(option);
+                    } else {
+                        newTestamentGroup.appendChild(option);
+                    }
+                }
+            });
+
+            // Append groups only if they have children
+            if (oldTestamentGroup.children.length > 0) {
+                dom.bookSelect.appendChild(oldTestamentGroup);
+            }
+            if (newTestamentGroup.children.length > 0) {
+                dom.bookSelect.appendChild(newTestamentGroup);
+            }
+
+            // Select the first book in the filtered list
+            if (dom.bookSelect.options.length > 0) {
+                dom.bookSelect.value = dom.bookSelect.options[0].value;
+            } else {
+                dom.bookSelect.value = ""; // No book selected
+            }
+            // Populate chapters for the selected/first book, but don't auto-fetch content yet
+            if (dom.bookSelect.value) {
+                populateChapters(dom.bookSelect.value);
+            } else {
+                dom.chapterSelect.innerHTML = ''; // Clear chapters if no book
+            }
+        }
+
+
+        /**
+         * Populates the chapter selection dropdown based on the selected book.
+         * @param {string} selectedBookName - The name of the currently selected book.
+         */
+        function populateChapters(selectedBookName) {
+            const book = BIBLE_BOOKS.find(b => b.name === selectedBookName);
+            dom.chapterSelect.innerHTML = ''; // Clear existing options
+            if (book) {
+                for (let i = 1; i <= book.chapters; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `Chapter ${i}`;
+                    dom.chapterSelect.appendChild(option);
+                }
+            }
+        }
+
+        /**
+         * Populates the verse selection dropdown based on the number of verses in the current chapter.
+         * @param {number} verseCount - The total number of verses in the current chapter.
+         */
+        function populateVerses(verseCount) {
+            dom.verseSelect.innerHTML = ''; // Clear existing options
+            dom.verseSelect.disabled = false;
+
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'All Verses';
+            dom.verseSelect.appendChild(allOption);
+
+            for (let i = 1; i <= verseCount; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Verse ${i}`;
+                dom.verseSelect.appendChild(option);
+            }
+        }
+
+        /**
+         * Fetches and displays a Bible chapter from the bible-api.com.
+         * @param {boolean} [autoLoad=false] - True if called during initial app load.
+         */
+        async function fetchBibleChapter(autoLoad = false) {
+            const book = dom.bookSelect.value;
+            const chapter = dom.chapterSelect.value;
+            const version = dom.versionSelect.value;
+
+            // Stop audio and clear search highlights whenever new content is fetched
+            stopAudio();
+            clearSearchHighlights();
+
+            if (!book || !chapter) {
+                if (!autoLoad) showMessage('error', 'Please select a valid book and chapter.');
+                return;
+            }
+
+            showMessage('loading');
+            const apiUrl = `https://bible-api.com/${book} ${chapter}?translation=${version}`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Network response was not ok (status: ${response.status})`);
+                }
+                const data = await response.json();
+
+                // Store the raw fetched content for audio and search
+                currentChapterContent = data.verses;
+
+                displayChapter(data);
+                populateVerses(data.verses.length);
+                saveLastRead(book, chapter, version);
+            } catch (error) {
+                console.error("Error fetching Bible chapter:", error);
+                showMessage('error', `Could not load chapter: ${error.message}. Please try a different version or chapter.`);
+            }
+        }
+
+
+        /**
+         * Displays the fetched chapter content in the UI.
+         * @param {object} data - The JSON data from the Bible API.
+         */
+        function displayChapter(data) {
+            dom.chapterTitle.textContent = `${data.reference} (${dom.versionSelect.options[dom.versionSelect.selectedIndex].textContent})`;
+            dom.versesContainer.innerHTML = ''; // Clear previous content
+
+            if (data.verses && data.verses.length > 0) {
+                data.verses.forEach(v => {
+                    const p = document.createElement('p');
+                    p.id = `verse-${v.verse}`;
+                    p.classList.add('mb-4'); // Add margin between verses
+                    // Display only the number visually, without "Verse" prefix
+                    p.innerHTML = `<span class="verse-number">${v.verse}</span>${v.text}`;
+                    dom.versesContainer.appendChild(p);
+                });
+            } else {
+                dom.versesContainer.innerHTML = `<p class="text-center text-slate-500 dark:text-white">No verses found for this chapter. This may occur for specific books or chapters with this API.</p>`;
+            }
+            updateNavButtons();
+            showContent();
+        }
+
+        /**
+         * Highlights a specific verse in the displayed chapter.
+         * @param {string} verseNumber - The number of the verse to highlight, or 'all' to remove highlight.
+         */
+        function highlightVerse(verseNumber) {
+            // This function is for direct verse selection/highlighting, not search highlights
+            const highlighted = dom.versesContainer.querySelector('.verse-highlight');
+            if (highlighted) {
+                highlighted.classList.remove('verse-highlight');
+            }
+
+            if (verseNumber === 'all') return; // Do nothing if 'All Verses' is selected
+
+            const verseElement = document.getElementById(`verse-${verseNumber}`);
+            if (verseElement) {
+                verseElement.classList.add('verse-highlight');
+                // Scroll to the verse, making sure it's centered in the view
+                verseElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        /**
+         * Updates the disabled state of the previous and next chapter navigation buttons.
+         */
+        function updateNavButtons() {
+            const currentBookIndex = BIBLE_BOOKS.findIndex(b => b.name === dom.bookSelect.value);
+            const currentChapter = parseInt(dom.chapterSelect.value);
+            const currentBook = BIBLE_BOOKS[currentBookIndex];
+
+            // Determine if previous chapter exists
+            const canGoPrev = currentChapter > 1 || currentBookIndex > 0;
+            dom.prevChapterBtn.disabled = !canGoPrev;
+
+            // Determine if next chapter exists
+            const canGoNext = currentChapter < currentBook.chapters || currentBookIndex < BIBLE_BOOKS.length - 1;
+            dom.nextChapterBtn.disabled = !canGoNext;
+        }
+
+        /**
+         * Navigates to the previous or next chapter.
+         * @param {string} direction - 'prev' or 'next'.
+         */
+        function navigateChapter(direction) {
+            let currentBookIndex = BIBLE_BOOKS.findIndex(b => b.name === dom.bookSelect.value);
+            let currentChapter = parseInt(dom.chapterSelect.value);
+
+            if (direction === 'next') {
+                if (currentChapter < BIBLE_BOOKS[currentBookIndex].chapters) {
+                    dom.chapterSelect.value = currentChapter + 1;
+                } else if (currentBookIndex < BIBLE_BOOKS.length - 1) {
+                    dom.bookSelect.value = BIBLE_BOOKS[currentBookIndex + 1].name;
+                    populateChapters(dom.bookSelect.value); // Re-populate chapters for the new book
+                    dom.chapterSelect.value = 1; // Start at chapter 1 of the new book
+                }
+            } else if (direction === 'prev') {
+                if (currentChapter > 1) {
+                    dom.chapterSelect.value = currentChapter - 1;
+                } else if (currentBookIndex > 0) {
+                    dom.bookSelect.value = BIBLE_BOOKS[currentBookIndex - 1].name;
+                    populateChapters(dom.bookSelect.value); // Re-populate chapters for the new book
+                    dom.chapterSelect.value = BIBLE_BOOKS[currentBookIndex - 1].chapters; // Go to last chapter of previous book
+                }
+            }
+            fetchBibleChapter(); // Use API fetcher
+        }
+
+        // --- AUDIO FUNCTIONS (Speech and Background Music) --- //
+        let currentAudioVerseIndex = 0; // Track which verse is being read
+
+        /**
+         * Populates the voice selection dropdown with available English voices.
+         */
+        function populateVoices() {
+            availableSpeechVoices = speechSynth.getVoices().filter(voice => voice.lang.startsWith('en-'));
+            dom.voiceSelect.innerHTML = ''; // Clear existing options
+
+            if (availableSpeechVoices.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No voices available';
+                dom.voiceSelect.appendChild(option);
+                dom.voiceSelect.disabled = true;
+                return;
+            }
+
+            availableSpeechVoices.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                dom.voiceSelect.appendChild(option);
+            });
+
+            dom.voiceSelect.disabled = false;
+            // Attempt to load saved voice
+            const savedVoiceName = localStorage.getItem('bibleAppVoice');
+            if (savedVoiceName && availableSpeechVoices.some(v => v.name === savedVoiceName)) {
+                dom.voiceSelect.value = savedVoiceName;
+            } else {
+                // Select a default English voice if available (e.g., first one found)
+                if (availableSpeechVoices.length > 0) {
+                    dom.voiceSelect.value = availableSpeechVoices[0].name;
+                    localStorage.setItem('bibleAppVoice', availableSpeechVoices[0].name);
+                }
+            }
+        }
+
+
+        /**
+         * Starts the background music.
+         */
+        function startBackgroundMusic() {
+            if (Tone.context.state !== 'running') {
+                // Ensure audio context is running on user interaction
+                Tone.start().then(() => {
+                    console.log("Tone.js audio context started.");
+                    if (!backgroundLoop) {
+                        createBackgroundLoop();
+                    }
+                    Tone.Transport.start();
+                }).catch(e => console.error("Failed to start Tone.js audio context:", e));
+            } else {
+                 if (!backgroundLoop) {
+                    createBackgroundLoop();
+                }
+                Tone.Transport.start();
+            }
+        }
+
+        /**
+         * Creates and starts the Tone.js loop for background music.
+         * This function should only be called once the audio context is running.
+         */
+        function createBackgroundLoop() {
+             // Create a loop for a soft, meditative chord/drone (C major)
+            backgroundLoop = new Tone.Loop(time => {
+                backgroundSynth.triggerAttackRelease(["C2", "E2", "G2"], "4n", time, 0.4); // 4n duration, 0.4 velocity
+            }, "1n").start(0); // Repeat every 1 note (whole note), start immediately
+            // Set a very low volume for background music
+            backgroundSynth.volume.value = -30; // Further reduced volume for subtlety
+        }
+
+        /**
+         * Pauses the background music.
+         */
+        function pauseBackgroundMusic() {
+            if (Tone.Transport.state === 'started') {
+                Tone.Transport.pause();
+            }
+        }
+
+        /**
+         * Stops and disposes of the background music.
+         */
+        function stopBackgroundMusic() {
+            if (backgroundLoop) {
+                backgroundLoop.stop();
+                backgroundLoop.dispose(); // Clean up the loop
+                backgroundLoop = null;
+            }
+            Tone.Transport.stop(); // Stop Tone.js transport
+            Tone.Transport.cancel(); // Clear all scheduled events
+            backgroundSynth.releaseAll(); // Release any held notes
+        }
+
+        /**
+         * Stops both speech synthesis and background music.
+         */
+        function stopAudio() {
+            if (speechSynth.speaking || speechSynth.paused) {
+                speechSynth.cancel();
+            }
+            stopBackgroundMusic(); // Call the function to stop background music
+            // Remove any speaking highlight
+            const speakingHighlight = dom.versesContainer.querySelector('.speaking-highlight');
+            if (speakingHighlight) {
+                speakingHighlight.classList.remove('speaking-highlight');
+            }
+        }
+
+        function playAudio() {
+            stopAudio(); // Stop any previous speech and background music
+            if (!currentChapterContent || currentChapterContent.length === 0) {
+                dom.errorMessage.textContent = 'No verses loaded to read aloud.';
+                dom.errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            const bookName = dom.bookSelect.value;
+            const chapterNum = dom.chapterSelect.value;
+
+            // Start background music
+            startBackgroundMusic();
+
+            // First, read the book and chapter reference
+            const introText = `${bookName} Chapter ${chapterNum}.`;
+            utterance = new SpeechSynthesisUtterance(introText);
+            utterance.lang = 'en-US'; // Set language
+
+            const selectedVoiceName = dom.voiceSelect.value;
+            const selectedVoice = availableSpeechVoices.find(voice => voice.name === selectedVoiceName);
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            } else {
+                console.warn(`Selected voice "${selectedVoiceName}" not found. Using default voice.`);
+            }
+
+            utterance.onend = () => {
+                currentAudioVerseIndex = 0; // Reset index to start from the first verse
+                readVerseAudio(currentAudioVerseIndex); // Start reading the verses after the intro
+            };
+
+            speechSynth.speak(utterance);
+        }
+
+        function readVerseAudio(index) {
+            if (index >= currentChapterContent.length) {
+                // All verses read
+                stopAudio(); // Stop both speech and background music
+                console.log("Finished reading chapter.");
+                return;
+            }
+
+            const verseData = currentChapterContent[index];
+            const verseElement = document.getElementById(`verse-${verseData.verse}`);
+
+            if (!verseElement) {
+                 console.warn(`Verse element for verse ${verseData.verse} not found in DOM, skipping.`);
+                 // Skip this verse and try the next one
+                 currentAudioVerseIndex++;
+                 readVerseAudio(currentAudioVerseIndex);
+                 return;
+            }
+
+            // Get the text to read for the utterance. Include the "Verse X" prefix for speech.
+            // The visual display will not have "Verse" prefix, but speech will.
+            const textToRead = `Verse ${verseData.verse}. ${verseData.text}`;
+            utterance = new SpeechSynthesisUtterance(textToRead);
+            utterance.lang = 'en-US'; // Set language
+
+            // Set the voice for the utterance
+            const selectedVoiceName = dom.voiceSelect.value;
+            const selectedVoice = availableSpeechVoices.find(voice => voice.name === selectedVoiceName);
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            } else {
+                console.warn(`Selected voice "${selectedVoiceName}" not found. Using default voice.`);
+            }
+
+
+            utterance.onend = () => {
+                // Remove highlight from the verse just finished
+                const currentlyReading = dom.versesContainer.querySelector('.speaking-highlight');
+                if (currentlyReading) {
+                    currentlyReading.classList.remove('speaking-highlight');
+                }
+                currentAudioVerseIndex++;
+                readVerseAudio(currentAudioVerseIndex); // Read the next verse
+            };
+
+            // Visually highlight the verse being read
+            const allVerseElements = dom.versesContainer.querySelectorAll('p');
+            allVerseElements.forEach(p => p.classList.remove('speaking-highlight'));
+            verseElement.classList.add('speaking-highlight');
+            verseElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Scroll to current verse
+
+            speechSynth.speak(utterance);
+        }
+
+        function pauseAudio() {
+            if (speechSynth.speaking && !speechSynth.paused) {
+                speechSynth.pause();
+                pauseBackgroundMusic(); // Pause background music
+            }
+        }
+
+        // --- SEARCH FUNCTIONS --- //
+
+        /**
+         * Clears all search highlights from the verses and resets the search results count.
+         */
+        function clearSearchHighlights() {
+            // Restore original HTML from `currentChapterContent` to remove all highlights reliably
+            if (currentChapterContent && currentChapterContent.length > 0) {
+                // Display only the number visually, without "Verse" prefix
+                dom.versesContainer.innerHTML = currentChapterContent.map(v =>
+                    `<p id="verse-${v.verse}"><span class="verse-number">${v.verse}</span>${v.text}</p>`
+                ).join('');
+            }
+            dom.searchResultsCount.classList.add('hidden');
+            dom.searchResultsCount.textContent = ''; // Clear count text
+        }
+
+        /**
+         * Searches for a term within the displayed verses and highlights occurrences.
+         */
+        function searchVerses() {
+            clearSearchHighlights(); // Always clear previous highlights first
+            const searchTerm = dom.searchInput.value.trim();
+            if (!searchTerm) {
+                dom.searchResultsCount.classList.add('hidden');
+                return;
+            }
+
+            // Create a regex for case-insensitive global search, escaping special characters
+            const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            let matchCount = 0;
+
+            // Iterate through the raw currentChapterContent for searching
+            currentChapterContent.forEach(verseData => {
+                const verseElement = document.getElementById(`verse-${verseData.verse}`);
+                if (!verseElement) return; // Skip if element not found (shouldn't happen if displayChapter works)
+
+                const textContentForSearch = verseData.text; // Use the raw text from the API for searching
+
+                const highlightedHtml = textContentForSearch.replace(regex, (match) => {
+                    matchCount++;
+                    return `<span class="search-highlight">${match}</span>`;
+                });
+
+                // Re-insert HTML with only the number and the highlighted text
+                verseElement.innerHTML = `<span class="verse-number">${verseData.verse}</span>` + highlightedHtml;
+            });
+
+            dom.searchResultsCount.textContent = `Found ${matchCount} occurrence(s).`;
+            dom.searchResultsCount.classList.remove('hidden');
+
+            if (matchCount > 0) {
+                 // Scroll to the first highlighted instance if any
+                const firstHighlight = dom.versesContainer.querySelector('.search-highlight');
+                if (firstHighlight) {
+                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        // --- DAILY VERSE POP-UP LOGIC ---
+
+        /**
+         * Shows the daily memory verse pop-up if it hasn't been shown today.
+         * The `force` parameter allows overriding the daily check for manual display.
+         * @param {boolean} force - If true, displays the pop-up regardless of whether it was shown today.
+         */
+        function showDailyVersePopup(force = false) {
+            const today = new Date().toDateString(); // Get today's date string (e.g., "Mon Jun 08 2025")
+            const lastShownDate = localStorage.getItem('lastDailyVerseDate');
+
+            if (!force && lastShownDate === today) {
+                // Verse already shown today, do nothing (unless forced)
+                console.log("Daily verse already shown today (or not forced).");
+                return;
+            }
+
+            // Select a random verse
+            const randomIndex = Math.floor(Math.random() * MEMORY_VERSES.length);
+            const dailyVerse = MEMORY_VERSES[randomIndex];
+
+            // Populate the modal content
+            dom.dailyVerseText.textContent = dailyVerse.text;
+            dom.dailyVerseReference.textContent = dailyVerse.reference;
+
+            // Show the modal with animation
+            dom.dailyVerseModal.classList.remove('hidden');
+            setTimeout(() => {
+                dom.dailyVerseContent.classList.remove('scale-95', 'opacity-0');
+                dom.dailyVerseContent.classList.add('scale-100', 'opacity-100');
+            }, 50); // Small delay to allow CSS transition
+
+            // Only save today's date if it's not a forced display (to allow repeat manual clicks)
+            if (!force) {
+                localStorage.setItem('lastDailyVerseDate', today);
+            }
+        }
+
+        /**
+         * Hides the daily memory verse pop-up.
+         */
+        function closeDailyVersePopup() {
+            dom.dailyVerseContent.classList.remove('scale-100', 'opacity-100');
+            dom.dailyVerseContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                dom.dailyVerseModal.classList.add('hidden');
+            }, 300); // Match CSS transition duration
+        }
+
+        /**
+         * Checks if it's 6 AM and shows the daily verse pop-up.
+         */
+        function checkAndShowDailyVerse() {
+            const now = new Date();
+            const hours = now.getHours();
+            // Show only at 6 AM. The `lastDailyVerseDate` local storage prevents showing it multiple times per day.
+            if (hours === 6) {
+                showDailyVersePopup();
+            }
+        }
+
+        // --- LOCAL STORAGE & INITIALIZATION --- //
+
+        /**
+         * Saves the current book, chapter, and version to local storage.
+         * @param {string} book - The current book name.
+         * @param {string} chapter - The current chapter number.
+         * @param {string} version - The current version code.
+         */
+        function saveLastRead(book, chapter, version) {
+            const lastRead = { book, chapter, version };
+            localStorage.setItem('bibleAppLastRead', JSON.stringify(lastRead));
+        }
+
+        /**
+         * Loads the last read book, chapter, and version from local storage.
+         * Sets the dropdowns to these values if found.
+         * @returns {boolean} - True if last read data was found and loaded, false otherwise.
+         */
+        function loadLastRead() {
+            const lastReadJSON = localStorage.getItem('bibleAppLastRead');
+            if (lastReadJSON) {
+                const lastRead = JSON.parse(lastReadJSON);
+                // Ensure the book/version still exist in our data before setting
+                if (BIBLE_BOOKS.some(b => b.name === lastRead.book) &&
+                    BIBLE_VERSIONS_LIST.some(v => v.value === lastRead.version)) {
+                    dom.bookSelect.value = lastRead.book;
+                    populateChapters(lastRead.book);
+                    dom.chapterSelect.value = lastRead.chapter;
+                    dom.versionSelect.value = lastRead.version;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Initializes the application when the DOM is fully loaded.
+         */
+        function initializeApp() {
+            feather.replace(); // Initialize Feather Icons
+
+            // Apply saved theme or system preference
+            const savedTheme = localStorage.getItem('bibleAppTheme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            applyTheme(savedTheme === 'dark' || (savedTheme === null && systemPrefersDark));
+
+            populateVersions(); // Populate versions dropdown
+            currentBookFilter = 'all'; // Start with all books visible
+            populateBooks(); // Populate books dropdown (with optgroups)
+
+            // Populate voices when they are ready
+            speechSynth.onvoiceschanged = () => {
+                populateVoices();
+                console.log("Voices loaded and populated.");
+            };
+            // Call populateVoices immediately, in case voices are already loaded
+            populateVoices();
+
+
+            // Attempt to load last read, otherwise default to Genesis 1, KJV
+            if (loadLastRead()) {
+                fetchBibleChapter(true); // Load last read passage using API
+            } else {
+                // Default selection: Genesis 1, KJV
+                dom.bookSelect.value = "Genesis";
+                populateChapters("Genesis"); // Populate chapters for Genesis
+                dom.chapterSelect.value = "1"; // Select Chapter 1
+                dom.versionSelect.value = "kjv"; // Select KJV by default
+                fetchBibleChapter(true); // Fetch Genesis 1, KJV using API
+            }
+
+            // --- EVENT LISTENERS --- //
+            dom.themeToggle.addEventListener('click', toggleTheme);
+
+            // Filtering buttons for testaments
+            dom.otButton.addEventListener('click', () => {
+                currentBookFilter = 'Old Testament';
+                populateBooks();
+                if (dom.bookSelect.value) { // Only fetch if a book is selected
+                    fetchBibleChapter();
+                } else {
+                    showMessage('welcome'); // Show welcome if no books in filter
+                }
+            });
+            dom.ntButton.addEventListener('click', () => {
+                currentBookFilter = 'New Testament';
+                populateBooks();
+                if (dom.bookSelect.value) { // Only fetch if a book is selected
+                    fetchBibleChapter();
+                } else {
+                    showMessage('welcome'); // Show welcome if no books in filter
+                }
+            });
+            dom.allBooksButton.addEventListener('click', () => {
+                currentBookFilter = 'all';
+                populateBooks();
+                if (dom.bookSelect.value) { // Only fetch if a book is selected
+                    fetchBibleChapter();
+                } else {
+                     showMessage('welcome'); // Show welcome if no books
+                }
+            });
+
+            dom.bookSelect.addEventListener('change', (e) => {
+                populateChapters(e.target.value);
+                dom.chapterSelect.value = "1"; // Reset chapter to 1 when book changes
+                fetchBibleChapter(); // Use API fetcher
+            });
+            dom.chapterSelect.addEventListener('change', () => fetchBibleChapter()); // Use API fetcher
+            dom.verseSelect.addEventListener('change', (e) => highlightVerse(e.target.value));
+            dom.versionSelect.addEventListener('change', () => fetchBibleChapter()); // Use API fetcher
+            dom.voiceSelect.addEventListener('change', (e) => {
+                localStorage.setItem('bibleAppVoice', e.target.value); // Save selected voice
+                stopAudio(); // Stop current audio to apply new voice
+            });
+            dom.prevChapterBtn.addEventListener('click', () => navigateChapter('prev'));
+            dom.nextChapterBtn.addEventListener('click', () => navigateChapter('next'));
+
+            // Audio event listeners
+            dom.playAudioBtn.addEventListener('click', playAudio);
+            dom.pauseAudioBtn.addEventListener('click', pauseAudio);
+            dom.stopAudioBtn.addEventListener('click', stopAudio);
+            dom.showDailyVerseBtn.addEventListener('click', () => showDailyVersePopup(true)); // Pass true to force display
+
+            // Search event listeners
+            dom.searchBtn.addEventListener('click', searchVerses);
+            dom.clearSearchBtn.addEventListener('click', clearSearchHighlights);
+            dom.searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchVerses();
+                }
+            });
+
+            // Daily verse pop-up event listener
+            dom.closeDailyVerseBtn.addEventListener('click', closeDailyVersePopup);
+
+            // Initial check for daily verse and schedule hourly checks
+            checkAndShowDailyVerse();
+            // Set interval to check every hour (60 minutes * 60 seconds * 1000 milliseconds)
+            setInterval(checkAndShowDailyVerse, 60 * 60 * 1000);
+        }
+
+        // Initialize the app once the DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+    </script>
+</body>
+</html>
