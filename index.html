@@ -153,7 +153,7 @@
             </div>
 
             <!-- Old Testament / New Testament Buttons -->
-            <div class="flex justify-center space-x-4 mt-4">
+            <div class="flex flex-wrap justify-center gap-4 mt-4">
                 <button id="ot-button" class="px-6 py-2 rounded-lg font-semibold transition-colors
                                              bg-blue-200 text-blue-800 hover:bg-blue-300
                                              dark:bg-blue-800 dark:text-white dark:hover:bg-blue-700">
@@ -186,7 +186,7 @@
                 </button>
             </div>
             <!-- Search Bar -->
-            <div class="flex items-center space-x-2 mt-6 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg shadow-inner">
+            <div class="flex flex-wrap items-center space-x-2 mt-6 p-4 bg-slate-50 dark:bg-slate-700 rounded-lg shadow-inner">
                 <input type="text" id="search-input" placeholder="Search for words (current chapter only)..."
                        class="flex-grow bg-white dark:bg-slate-600 border border-slate-300 dark:border-slate-500 text-slate-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
                 <button id="search-btn" class="px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition-colors flex items-center gap-1">
@@ -247,10 +247,7 @@
 
         <!-- Footer -->
         <footer class="text-center mt-8 text-sm text-slate-500 dark:text-white">
-            <p>Content provided by <a href="https://bible-api.com/" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">bible-api.com</a>.</p>
-            <p class="mt-1">
-                Note: This API primarily offers public domain translations. Other popular translations like The Passion Translation, New Living Translation, Amplified Bible, The Message, and New King James Version are typically copyrighted and require licensed APIs for their content.
-            </p>
+            <!-- Removed the previous content attribution and note -->
         </footer>
     </div>
 
@@ -745,7 +742,8 @@
                 option.value = '';
                 option.textContent = 'No voices available';
                 dom.voiceSelect.appendChild(option);
-                dom.voiceSelect.disabled = true;
+                dom.voiceSelect.disabled = true; // Disable if no voices
+                console.log("No speech synthesis voices found.");
                 return;
             }
 
@@ -756,7 +754,9 @@
                 dom.voiceSelect.appendChild(option);
             });
 
-            dom.voiceSelect.disabled = false;
+            dom.voiceSelect.disabled = false; // Enable if voices are found
+            console.log(`Found ${availableSpeechVoices.length} speech synthesis voices.`);
+
             // Attempt to load saved voice
             const savedVoiceName = localStorage.getItem('bibleAppVoice');
             if (savedVoiceName && availableSpeechVoices.some(v => v.name === savedVoiceName)) {
@@ -850,6 +850,13 @@
                 dom.errorMessage.classList.remove('hidden');
                 return;
             }
+
+            if (speechSynth.getVoices().length === 0) {
+                dom.errorMessage.textContent = 'No speech voices available on your device. Please check device settings.';
+                dom.errorMessage.classList.remove('hidden');
+                return;
+            }
+
 
             const bookName = dom.bookSelect.value;
             const chapterNum = dom.chapterSelect.value;
@@ -1110,12 +1117,13 @@
             currentBookFilter = 'all'; // Start with all books visible
             populateBooks(); // Populate books dropdown (with optgroups)
 
-            // Populate voices when they are ready
+            // Populate voices when they are ready. Crucially, this listener fires when voices become available.
             speechSynth.onvoiceschanged = () => {
                 populateVoices();
-                console.log("Voices loaded and populated.");
+                console.log("Speech synthesis voices loaded and dropdown populated.");
             };
-            // Call populateVoices immediately, in case voices are already loaded
+            // Also attempt to populate voices immediately, in case they are already loaded on initial page load
+            // (e.g., on desktop browsers or subsequent visits)
             populateVoices();
 
 
